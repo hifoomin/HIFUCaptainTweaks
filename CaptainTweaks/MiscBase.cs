@@ -9,7 +9,9 @@ namespace HIFUCaptainTweaks
 
         public T ConfigOption<T>(T value, string name, string description)
         {
-            return Main.HCAPTConfig.Bind<T>(Name, name, value, description).Value;
+            var config = Main.HCAPTConfig.Bind<T>(Name, name, value, description);
+            ConfigManager.HandleConfig<T>(config, Main.HCAPTBackupConfig, name);
+            return config.Value;
         }
 
         public abstract void Hooks();

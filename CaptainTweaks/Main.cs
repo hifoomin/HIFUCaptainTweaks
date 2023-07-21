@@ -1,6 +1,7 @@
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
+using HarmonyLib;
 using HIFUCaptainTweaks.Misc;
 using R2API;
 using R2API.ContentManagement;
@@ -22,12 +23,19 @@ namespace HIFUCaptainTweaks
 
         public const string PluginAuthor = "HIFU";
         public const string PluginName = "HIFUCaptainTweaks";
-        public const string PluginVersion = "1.2.1";
+        public const string PluginVersion = "1.2.2";
 
         public static AssetBundle hifucaptaintweaks;
 
         public static ConfigFile HCAPTConfig;
+        public static ConfigFile HCAPTBackupConfig;
+
+        public static ConfigEntry<bool> enableAutoConfig { get; set; }
+        public static ConfigEntry<string> latestVersion { get; set; }
+
         public static ManualLogSource HCAPTLogger;
+
+        public static bool _preVersioning = false;
 
         public void Awake()
         {
@@ -35,6 +43,19 @@ namespace HIFUCaptainTweaks
             HCAPTConfig = Config;
 
             hifucaptaintweaks = AssetBundle.LoadFromFile(Assembly.GetExecutingAssembly().Location.Replace("HIFUCaptainTweaks.dll", "hifucaptaintweaks"));
+
+            HCAPTBackupConfig = new(Paths.ConfigPath + "\\" + PluginAuthor + "." + PluginName + ".Backup.cfg", true);
+            HCAPTBackupConfig.Bind(": DO NOT MODIFY THIS FILES CONTENTS :", ": DO NOT MODIFY THIS FILES CONTENTS :", ": DO NOT MODIFY THIS FILES CONTENTS :", ": DO NOT MODIFY THIS FILES CONTENTS :");
+
+            enableAutoConfig = HCAPTConfig.Bind("Config", "Enable Auto Config Sync", true, "Disabling this would stop HIFUCaptainTweaks from syncing config whenever a new version is found.");
+            _preVersioning = !((Dictionary<ConfigDefinition, string>)AccessTools.DeclaredPropertyGetter(typeof(ConfigFile), "OrphanedEntries").Invoke(HCAPTConfig, null)).Keys.Any(x => x.Key == "Latest Version");
+            latestVersion = HCAPTConfig.Bind("Config", "Latest Version", PluginVersion, "DO NOT CHANGE THIS");
+            if (enableAutoConfig.Value && (_preVersioning || (latestVersion.Value != PluginVersion)))
+            {
+                latestVersion.Value = PluginVersion;
+                ConfigManager.VersionChanged = true;
+                HCAPTLogger.LogInfo("Config Autosync Enabled.");
+            }
 
             IEnumerable<Type> enumerable = from type in Assembly.GetExecutingAssembly().GetTypes()
                                            where !type.IsAbstract && type.IsSubclassOf(typeof(TweakBase))
